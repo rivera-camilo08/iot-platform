@@ -1,0 +1,57 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: iot_platform
+      POSTGRES_USER: iot_user
+      POSTGRES_PASSWORD: iot_password
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  api:
+    build: .
+    command: ["uvicorn", "iot_platform.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://iot_user:iot_password@db:5432/iot_platform
+      - JWT_SECRET_KEY=super-secret-change-me
+      - MQTT_BROKER_HOST=mqtt
+      - MQTT_BROKER_PORT=1883
+      - MQTT_CLIENT_ID=iot-platform-listener
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - mqtt
+
+  mqtt-listener:
+    build: .
+    command: ["python", "-m", "iot_platform.app.mqtt.listener"]
+    volumes:
+      - .:/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://iot_user:iot_password@db:5432/iot_platform
+      - JWT_SECRET_KEY=super-secret-change-me
+      - MQTT_BROKER_HOST=mqtt
+      - MQTT_BROKER_PORT=1883
+      - MQTT_CLIENT_ID=iot-platform-listener
+    depends_on:
+      - db
+      - mqtt
+
+volumes:
+  db_data:
+  mosquitto_data:
+  mosquitto_log:
