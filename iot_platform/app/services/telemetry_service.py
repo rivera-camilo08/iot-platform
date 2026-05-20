@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -32,7 +32,7 @@ class TelemetryService:
                     device_id=device_id,
                     sensor_type=sensor_type,
                     value=reading,
-                    recorded_at=recorded_at or datetime.utcnow(),
+                    recorded_at=recorded_at or datetime.now(timezone.utc),
                 )
             )
         if not records:

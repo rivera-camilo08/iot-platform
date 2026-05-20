@@ -6,6 +6,10 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from fastapi import FastAPI
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+from app.core.limiter import limiter
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.api import api_router
@@ -19,7 +23,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -33,10 +37,18 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-@app.on_event("startup")
-def on_startup() -> None:
-    Base.metadata.create_all(bind=engine)
+@app.get("/health", tags=["health"])
+def health_check():
+    return {"status": "ok"}
 
+# Configure rate limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+# En producción se debe ejecutar:
+#   alembic upgrade head
+# antes de iniciar la aplicación.
 
 if __name__ == "__main__":
     import uvicorn

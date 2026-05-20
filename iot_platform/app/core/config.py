@@ -17,11 +17,15 @@ class Settings(BaseSettings):
     mqtt_broker_host: str = Field("mqtt")
     mqtt_broker_port: int = Field(1883)
     mqtt_client_id: str = Field("iot-platform-listener")
+    mqtt_username: str | None = Field(None)
+    mqtt_password: str | None = Field(None)
     mqtt_topic_template: str = Field("devices/{mac_address}/telemetry")
+    cors_origins: list[str] = Field(default=["http://localhost:3000"])
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
         case_sensitive=False,
+        extra="ignore",
     )
 
 

@@ -9,6 +9,9 @@ from app.models.user import UserRole
 from app.repositories.device_repository import DeviceRepository
 from app.schemas.device import DeviceCreate, DeviceResponse
 from app.services.device_service import DeviceService
+from app.core.security import generate_device_token
+from app.utils.exceptions import EntityNotFound, UnauthorizedAction
+from app.schemas.device import DeviceUpdate
 
 router = APIRouter()
 
@@ -21,7 +24,7 @@ def create_device(
 ) -> DeviceResponse:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
-    device_token = service.create_device_token()
+    device_token = generate_device_token()
     owner = current_user
     if current_user.role == UserRole.admin and payload.owner_id:
         from app.repositories.user_repository import UserRepository
@@ -50,15 +53,17 @@ def create_device(
 
 @router.get("/", response_model=list[DeviceResponse])
 def list_devices(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[DeviceResponse]:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
     if current_user.role == UserRole.admin:
-        devices = service.list_devices()
+        devices = service.list_devices(skip=skip, limit=limit)
     else:
-        devices = service.list_devices(owner_id=current_user.id)
+        devices = service.list_devices(owner_id=current_user.id, skip=skip, limit=limit)
     return [DeviceResponse.from_orm(device) for device in devices]
 
 
@@ -72,7 +77,52 @@ def get_device(
     service = DeviceService(repository)
     device = service.get_device_by_id(device_id)
     if not device:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dispositivo no encontrado")
+        raise EntityNotFound("Dispositivo no encontrado")
     if current_user.role != UserRole.admin and device.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acceso denegado")
+        raise UnauthorizedAction()
     return DeviceResponse.from_orm(device)
+
+
+@router.patch("/{device_id}", response_model=DeviceResponse)
+def update_device(
+    device_id: UUID,
+    payload: DeviceUpdate,
+    current_user=Depends(require_user_or_admin),
+    db: Session = Depends(get_db),
+) -> DeviceResponse:
+    repository = DeviceRepository(db)
+    service = DeviceService(repository)
+    device = service.get_device_by_id(device_id)
+    if not device:
+        raise EntityNotFound("Dispositivo no encontrado")
+    if current_user.role != UserRole.admin and device.owner_id != current_user.id:
+        raise UnauthorizedAction()
+    # Apply updates
+    status_value = None
+    if payload.status is not None:
+        status_value = payload.status
+    updated = service.update_device(
+        device_id=device_id,
+        name=payload.name,
+        status=status_value,
+    )
+    if not updated:
+        raise EntityNotFound("Dispositivo no encontrado")
+    return DeviceResponse.from_orm(updated)
+
+
+@router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_device(
+    device_id: UUID,
+    current_user=Depends(require_user_or_admin),
+    db: Session = Depends(get_db),
+) -> None:
+    repository = DeviceRepository(db)
+    service = DeviceService(repository)
+    device = service.get_device_by_id(device_id)
+    if not device:
+        raise EntityNotFound("Dispositivo no encontrado")
+    if current_user.role != UserRole.admin and device.owner_id != current_user.id:
+        raise UnauthorizedAction()
+    service.delete_device(device_id)
+    return None

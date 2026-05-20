@@ -12,11 +12,12 @@ class TelemetryRepository:
         self.session = session
 
     def create_many(self, telemetry_batch: Iterable[Telemetry]) -> list[Telemetry]:
-        self.session.add_all(telemetry_batch)
+        records = list(telemetry_batch)
+        self.session.add_all(records)
         self.session.commit()
-        for record in telemetry_batch:
+        for record in records:
             self.session.refresh(record)
-        return list(telemetry_batch)
+        return records
 
     def get_by_device(self, device_id: UUID) -> list[Telemetry]:
         return (

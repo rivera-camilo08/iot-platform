@@ -13,6 +13,11 @@ from app.repositories.user_repository import UserRepository
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
+def get_settings() -> Generator["Settings", None, None]:
+    """Dependency that yields the application settings (consolidated here)."""
+    yield settings
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     try:
         payload = decode_token(token)

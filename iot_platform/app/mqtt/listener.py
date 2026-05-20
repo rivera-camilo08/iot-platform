@@ -92,6 +92,9 @@ def run() -> None:
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
         client.on_message = on_message
+        # If MQTT credentials are provided, use them
+        if getattr(settings, "mqtt_username", None) and getattr(settings, "mqtt_password", None):
+            client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
         client.reconnect_delay_set(min_delay=1, max_delay=30)
         return client
 

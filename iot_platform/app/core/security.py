@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+import secrets
 
 from app.core.config import settings
 
@@ -19,14 +20,14 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(subject: str, expires_delta: timedelta | None = None) -> str:
     expires_delta = expires_delta or timedelta(minutes=settings.jwt_access_token_expires_minutes)
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     payload: dict[str, Any] = {"sub": subject, "exp": expire, "type": "access"}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
 def create_refresh_token(subject: str, expires_delta: timedelta | None = None) -> str:
     expires_delta = expires_delta or timedelta(days=settings.jwt_refresh_token_expires_days)
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     payload: dict[str, Any] = {"sub": subject, "exp": expire, "type": "refresh"}
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -37,3 +38,7 @@ def decode_token(token: str) -> dict[str, Any]:
         return payload
     except JWTError as exc:
         raise ValueError("Token inválido o expirado") from exc
+
+
+def generate_device_token() -> str:
+    return secrets.token_urlsafe(32)

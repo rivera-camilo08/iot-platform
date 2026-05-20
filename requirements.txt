@@ -8,3 +8,7 @@ pydantic-settings>=2.6
 python-jose[cryptography]>=3.0.0
 passlib[bcrypt]>=1.7
 paho-mqtt>=1.6
+pytest>=7.0
+httpx>=0.24
+pytest-asyncio>=0.22
+slowapi>=0.1.9

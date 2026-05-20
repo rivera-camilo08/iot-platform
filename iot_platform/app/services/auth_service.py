@@ -1,4 +1,3 @@
-import secrets
 from datetime import timedelta
 from uuid import UUID
 
@@ -43,7 +42,4 @@ class AuthService:
 
     def refresh_token(self, user_id: UUID) -> Token:
         return self.create_tokens(user_id)
-
-    @staticmethod
-    def create_device_token() -> str:
-        return secrets.token_urlsafe(32)
+    # device token generation moved to app.core.security.generate_device_token

@@ -1,4 +1,3 @@
-import secrets
 from uuid import UUID
 
 from app.core.security import hash_password, verify_password
@@ -30,14 +29,12 @@ class DeviceService:
     def get_device_by_mac(self, mac_address: str) -> Device | None:
         return self.device_repository.get_by_mac(mac_address.lower())
 
-    def list_devices(self, owner_id: UUID | None = None) -> list[Device]:
+    def list_devices(self, owner_id: UUID | None = None, skip: int = 0, limit: int = 50) -> list[Device]:
         if owner_id is None:
-            return self.device_repository.list_all()
-        return self.device_repository.list_by_owner(owner_id)
+            return self.device_repository.list_all(skip=skip, limit=limit)
+        return self.device_repository.list_by_owner(owner_id, skip=skip, limit=limit)
 
-    @staticmethod
-    def create_device_token() -> str:
-        return secrets.token_urlsafe(32)
+    # device token generation moved to app.core.security.generate_device_token
 
     def validate_device_auth(self, mac_address: str, device_token: str) -> Device | None:
         device = self.get_device_by_mac(mac_address)
@@ -46,3 +43,20 @@ class DeviceService:
         if device.status != DeviceStatus.active:
             return None
         return device
+
+    def update_device(self, device_id: UUID, name: str | None = None, status: DeviceStatus | None = None) -> Device | None:
+        device = self.get_device_by_id(device_id)
+        if not device:
+            return None
+        if name is not None:
+            device.name = name
+        if status is not None:
+            device.status = status
+        return self.device_repository.update(device)
+
+    def delete_device(self, device_id: UUID) -> bool:
+        device = self.get_device_by_id(device_id)
+        if not device:
+            return False
+        self.device_repository.delete(device)
+        return True

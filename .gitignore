@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual env
+venv/
+.env/
+
+# Environment variables
+.env
+
+# Docker
+*.log
+
+# VSCode
+.vscode/
+
+# Pytest
+.pytest_cache/
+
+# Mac/Windows
+.DS_Store
+Thumbs.db
+
+# PostgreSQL volumes
+postgres_data/
+
+# Docker volumes
+volumes/
+
+# Mosquitto password file (if created locally)
+mosquitto/passwd
+mosquitto/config/passwd
