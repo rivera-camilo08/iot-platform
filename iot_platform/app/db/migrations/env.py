@@ -22,7 +22,21 @@ import app.models.telemetry  # noqa: F401
 config = context.config
 fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", os.environ.get("DATABASE_URL", "postgresql+psycopg2://iot_user:iot_password@localhost:5432/iot_platform"))
+# Prefer explicit DATABASE_URL. If not provided, build it from POSTGRES_* vars
+database_url = os.environ.get("DATABASE_URL")
+if not database_url:
+    pg_host = os.environ.get("POSTGRES_HOST", "localhost")
+    pg_port = os.environ.get("POSTGRES_PORT", "5432")
+    pg_db = os.environ.get("POSTGRES_DB", "iot_platform")
+    pg_user = os.environ.get("POSTGRES_USER", "iot_user")
+    pg_password = os.environ.get("POSTGRES_PASSWORD", "")
+    if pg_password:
+        database_url = f"postgresql+psycopg2://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
+    else:
+        # If no password provided, build URL without it (useful for local setups with trust auth)
+        database_url = f"postgresql+psycopg2://{pg_user}@{pg_host}:{pg_port}/{pg_db}"
+
+config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.api.deps import get_current_user, require_user_or_admin
 from app.db.session import get_db
-from app.models.device import Device
+from app.models.device import Device, DeviceStatus
 from app.models.user import UserRole
 from app.repositories.device_repository import DeviceRepository
 from app.schemas.device import DeviceCreate, DeviceResponse
@@ -26,7 +26,8 @@ def create_device(
     service = DeviceService(repository)
     device_token = generate_device_token()
     owner = current_user
-    if current_user.role == UserRole.admin and payload.owner_id:
+    # Only superadmin may create devices for other users
+    if payload.owner_id and current_user.role == UserRole.superadmin:
         from app.repositories.user_repository import UserRepository
 
         owner = UserRepository(db).get_by_id(payload.owner_id) or current_user
@@ -40,15 +41,12 @@ def create_device(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    return DeviceResponse(
-        id=device.id,
-        name=device.name,
-        mac_address=device.mac_address,
-        owner_id=device.owner_id,
-        status=device.status.value,
-        created_at=device.created_at.isoformat(),
-        device_token=device_token,
-    )
+    resp = DeviceResponse.from_orm(device)
+    # attach token only on creation response
+    resp.device_token = device_token
+    if current_user.role != UserRole.superadmin:
+        resp.owner = None
+    return resp
 
 
 @router.get("/", response_model=list[DeviceResponse])
@@ -60,11 +58,19 @@ def list_devices(
 ) -> list[DeviceResponse]:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
-    if current_user.role == UserRole.admin:
+    # Only superadmin can list all devices
+    if current_user.role == UserRole.superadmin:
         devices = service.list_devices(skip=skip, limit=limit)
     else:
-        devices = service.list_devices(owner_id=current_user.id, skip=skip, limit=limit)
-    return [DeviceResponse.from_orm(device) for device in devices]
+        devices = service.list_devices_for_user(current_user, skip=skip, limit=limit)
+
+    results: list[DeviceResponse] = []
+    for device in devices:
+        resp = DeviceResponse.from_orm(device)
+        if current_user.role != UserRole.superadmin:
+            resp.owner = None
+        results.append(resp)
+    return results
 
 
 @router.get("/{device_id}", response_model=DeviceResponse)
@@ -75,12 +81,16 @@ def get_device(
 ) -> DeviceResponse:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
-    device = service.get_device_by_id(device_id)
+    device = service.get_device_by_id_for_user(device_id, current_user)
     if not device:
         raise EntityNotFound("Dispositivo no encontrado")
-    if current_user.role != UserRole.admin and device.owner_id != current_user.id:
+    # repository/service already filtered by user; additional check defensive
+    if current_user.role not in {UserRole.superadmin, UserRole.admin} and device.owner_id != current_user.id:
         raise UnauthorizedAction()
-    return DeviceResponse.from_orm(device)
+    resp = DeviceResponse.from_orm(device)
+    if current_user.role != UserRole.superadmin:
+        resp.owner = None
+    return resp
 
 
 @router.patch("/{device_id}", response_model=DeviceResponse)
@@ -92,23 +102,48 @@ def update_device(
 ) -> DeviceResponse:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
-    device = service.get_device_by_id(device_id)
+    device = service.get_device_by_id_for_user(device_id, current_user)
     if not device:
         raise EntityNotFound("Dispositivo no encontrado")
-    if current_user.role != UserRole.admin and device.owner_id != current_user.id:
+    if current_user.role not in {UserRole.superadmin, UserRole.admin} and device.owner_id != current_user.id:
         raise UnauthorizedAction()
-    # Apply updates
+
+    # Convierte string → enum de forma segura
     status_value = None
     if payload.status is not None:
-        status_value = payload.status
-    updated = service.update_device(
-        device_id=device_id,
-        name=payload.name,
-        status=status_value,
-    )
+        try:
+            status_value = DeviceStatus(payload.status)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Estado '{payload.status}' no válido. Valores permitidos: {[e.value for e in DeviceStatus]}"
+            )
+
+    # Valida que haya al menos un campo a actualizar
+    if payload.name is None and payload.status is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debes enviar al menos un campo para actualizar (name o status)"
+        )
+
+    try:
+        updated = service.update_device(
+            device_id=device_id,
+            name=payload.name,
+            status=status_value,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al actualizar el dispositivo: {str(exc)}"
+        )
+
     if not updated:
         raise EntityNotFound("Dispositivo no encontrado")
-    return DeviceResponse.from_orm(updated)
+    resp = DeviceResponse.from_orm(updated)
+    if current_user.role != UserRole.superadmin:
+        resp.owner = None
+    return resp
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -119,10 +154,10 @@ def delete_device(
 ) -> None:
     repository = DeviceRepository(db)
     service = DeviceService(repository)
-    device = service.get_device_by_id(device_id)
+    device = service.get_device_by_id_for_user(device_id, current_user)
     if not device:
         raise EntityNotFound("Dispositivo no encontrado")
-    if current_user.role != UserRole.admin and device.owner_id != current_user.id:
+    if current_user.role not in {UserRole.superadmin, UserRole.admin} and device.owner_id != current_user.id:
         raise UnauthorizedAction()
     service.delete_device(device_id)
     return None

@@ -39,13 +39,21 @@ class TelemetryService:
             raise ValueError("No se encontraron lecturas de sensores válidas")
         return self.telemetry_repository.create_many(records)
 
-    def get_device_telemetry(self, device_id: UUID) -> list[Telemetry]:
-        return self.telemetry_repository.get_by_device(device_id)
+    def get_device_telemetry(self, device_id: UUID, skip: int = 0, limit: int = 100) -> list[Telemetry]:
+        return self.telemetry_repository.get_by_device(device_id, skip=skip, limit=limit)
 
     def query_device_telemetry(
         self,
         device_id: UUID,
         start: datetime | None = None,
         end: datetime | None = None,
+        skip: int = 0,
+        limit: int = 100,
     ) -> list[Telemetry]:
-        return self.telemetry_repository.query_range(device_id, start=start, end=end)
+        return self.telemetry_repository.query_range(
+            device_id,
+            start=start,
+            end=end,
+            skip=skip,
+            limit=limit,
+        )

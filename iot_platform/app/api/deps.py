@@ -54,12 +54,21 @@ def require_role(role: UserRole):
 
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != UserRole.admin:
+    if current_user.role not in {UserRole.superadmin, UserRole.admin}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos de administrador requeridos")
     return current_user
 
 
+def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role != UserRole.superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren permisos de superadministrador",
+        )
+    return current_user
+
+
 def require_user_or_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {UserRole.admin, UserRole.user}:
+    if current_user.role not in {UserRole.superadmin, UserRole.admin, UserRole.user}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permisos insuficientes")
     return current_user

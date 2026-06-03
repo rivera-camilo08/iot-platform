@@ -10,6 +10,7 @@ from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
+    superadmin = "superadmin"
     admin = "admin"
     user = "user"
     device = "device"
@@ -24,4 +25,4 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.user, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    devices: Mapped[list["Device"]] = relationship("Device", back_populates="owner", lazy="selectin")
+    devices: Mapped[list["Device"]] = relationship("Device", back_populates="owner", lazy="noload")

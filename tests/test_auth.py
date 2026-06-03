@@ -1,5 +1,15 @@
+import os
+import sys
+from pathlib import Path
+
+# Ensure tests use the local package and testing DB
+cwd = Path(__file__).resolve().parent.parent
+os.environ.setdefault("ENVIRONMENT", "testing")
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{cwd / 'tests' / 'test.db'}")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'iot_platform')))
+
 from fastapi.testclient import TestClient
-from iot_platform.app.main import app
+from app.main import app
 
 client = TestClient(app)
 

@@ -26,6 +26,9 @@ class DeviceService:
     def get_device_by_id(self, device_id: UUID) -> Device | None:
         return self.device_repository.get_by_id(device_id)
 
+    def get_device_by_id_for_user(self, device_id: UUID, user) -> Device | None:
+        return self.device_repository.get_by_id_for_user(device_id, user)
+
     def get_device_by_mac(self, mac_address: str) -> Device | None:
         return self.device_repository.get_by_mac(mac_address.lower())
 
@@ -33,6 +36,9 @@ class DeviceService:
         if owner_id is None:
             return self.device_repository.list_all(skip=skip, limit=limit)
         return self.device_repository.list_by_owner(owner_id, skip=skip, limit=limit)
+
+    def list_devices_for_user(self, user, skip: int = 0, limit: int = 50) -> list[Device]:
+        return self.device_repository.list_for_user(user, skip=skip, limit=limit)
 
     # device token generation moved to app.core.security.generate_device_token
 

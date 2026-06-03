@@ -19,18 +19,27 @@ class TelemetryRepository:
             self.session.refresh(record)
         return records
 
-    def get_by_device(self, device_id: UUID) -> list[Telemetry]:
+    def get_by_device(self, device_id: UUID, skip: int = 0, limit: int = 100) -> list[Telemetry]:
         return (
             self.session.query(Telemetry)
             .filter(Telemetry.device_id == device_id)
             .order_by(Telemetry.recorded_at.desc())
+            .offset(skip)
+            .limit(limit)
             .all()
         )
 
-    def query_range(self, device_id: UUID, start: datetime | None = None, end: datetime | None = None) -> list[Telemetry]:
+    def query_range(
+        self,
+        device_id: UUID,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[Telemetry]:
         query = self.session.query(Telemetry).filter(Telemetry.device_id == device_id)
         if start:
             query = query.filter(Telemetry.recorded_at >= start)
         if end:
             query = query.filter(Telemetry.recorded_at <= end)
-        return query.order_by(Telemetry.recorded_at.desc()).all()
+        return query.order_by(Telemetry.recorded_at.desc()).offset(skip).limit(limit).all()
